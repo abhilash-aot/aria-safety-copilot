@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data artifacts — regeneratable, keep repo light
+tracks/*/data/raw/*.parquet
+tracks/*/data/raw/*.sqlite
+# keep sample CSVs committed for preview
+!tracks/*/data/sample/*.csv
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Claude Code local config — never commit (per-machine permissions)
+.claude/
+.claude.json
+
+# Stale artefacts
+hearth/
+
+# PR scratch files + diagnostic screenshot dumps
+pr_body.md
+docs/screenshots/_*/
+
+# Build
+dist/
+build/
+*.egg-info/
+BUILD_SPEC.md
+
+# Track 2 build artefacts
+data/cache/
+__pycache__/
+.pytest_cache/
+.DS_Store
+*.pyc

@@ -1,0 +1,60 @@
+{
+  "generated_at": "2026-04-23T23:00:12Z",
+  "data_dir": "/Users/shabeeb/Work/Other Hacks/social victoria/buildersvault-hackathon-build/tracks/food-security-delivery/data/raw",
+  "detector_accuracy": {
+    "severe_allergen": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "ground_truth_count": 3
+    },
+    "post_closure": {
+      "tp": 4,
+      "fp": 148,
+      "fn": 0,
+      "precision": 0.0263,
+      "recall": 1.0,
+      "f1": 0.0513,
+      "ground_truth_count": 4
+    },
+    "two_person_solo": {
+      "tp": 7,
+      "fp": 233,
+      "fn": 0,
+      "precision": 0.0292,
+      "recall": 1.0,
+      "f1": 0.0567,
+      "ground_truth_count": 7
+    }
+  },
+  "optimizer_delta": {
+    "sampled_dates": [
+      "2026-03-25",
+      "2026-03-27",
+      "2026-03-29",
+      "2026-03-31",
+      "2026-04-02",
+      "2026-04-04",
+      "2026-04-06",
+      "2026-04-08",
+      "2026-04-10",
+      "2026-04-12",
+      "2026-04-14"
+    ],
+    "mean_delta_pct": 0.8905,
+    "mean_projected_on_time_rate": 0.3558,
+    "mean_routes_per_day": 2.2727,
+    "mean_drops_per_day": 56.8182,
+    "mean_total_minutes": 69.5455,
+    "mean_baseline_minutes": 3622.7273
+  },
+  "constraint_audit": {
+    "optimizer_critical_count": 0,
+    "optimizer_high_count": 0,
+    "baseline_mean_critical_per_day": 0.09,
+    "baseline_mean_high_per_day": 15.82
+  }
+}
