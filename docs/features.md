@@ -1,0 +1,150 @@
+# Features in depth
+
+A fuller tour of what lives under `src/` and how the pages wire it up. For the
+30-second version, see the [main README](../README.md).
+
+---
+
+## 🛡️ 8 safety detectors — `src/safety/detectors.py`
+
+| Rule | Severity | Catches |
+|---|---|---|
+| `check_severe_allergen` | 🔴 CRITICAL | Line items with an allergen the client is severe / anaphylactic about |
+| `check_cold_chain` | 🔴 CRITICAL | Cold-chain requests on a non-refrigerated vehicle |
+| `check_wheelchair_lift` | 🟠 HIGH | Wheelchair client assigned to any vehicle except VEH-06 |
+| `check_two_person_solo` | 🟠 HIGH | Two-person client on a single-driver route (respects `partner_driver_id`) |
+| `check_post_closure_delivery` | 🟡 MEDIUM | Delivery scheduled after the client's file-closure date |
+| `check_driver_pet_allergy` | 🟡 MEDIUM | Pet-allergic driver at a client with a dog on premises |
+| `check_interpreter_language` | 🟡 MEDIUM | Interpreter needed but driver lacks the language |
+| `check_driver_hours_distance` | ⚪ LOW | Weekly hours / distance cap nearing |
+
+**Measured recall = 1.00** on every seeded ground-truth case (3/3 allergen, 4/4 post-closure, 7/7 two-person solo). See [`eval/SCORECARD.md`](../eval/SCORECARD.md).
+
+---
+
+## 🚚 Safe-by-construction optimizer — `src/optimizer/constrained_greedy.py`
+
+Nearest-neighbour greedy VRP with hard-constraint pre-filtering:
+
+1. Drop closed / deceased clients
+2. Drop allergen-blocked requests
+3. Per-request eligibility matrix (vehicle + driver skills + language + pet allergy)
+4. Per-route caps (`max_stops`, `max_distance_km`, `max_hours`, weekly ISO-week sum)
+
+Output: `{routes, dropped_requests, total_drive_minutes, baseline_drive_minutes, delta_pct, projected_on_time_rate, violations=[]}`.
+
+Measured across 11 sampled service dates: **0 CRITICAL + 0 HIGH** violations vs baseline's mean **0.09 CRITICAL + 15.82 HIGH** per day.
+
+**Bonus:** `src/optimizer/vrp.py` ships an **OR-Tools VRP** alternate (`PATH_CHEAPEST_ARC` + `GUIDED_LOCAL_SEARCH`, 10s time-limit) with the same interface.
+
+---
+
+## 📊 Risk Snapshot — `src/safety/score.py`
+
+Severity-weighted (CRITICAL=10, HIGH=5, MEDIUM=2, LOW=1) risk score that climbs as fixes are applied:
+
+- `raw == 0` → "✅ Schedule clean"
+- `raw > 0, current == 0` → "✅ All N risk pts cleared"
+- `cleared > 0` → "🔧 X of Y risk pts cleared · keep going"
+- no fixes yet → "⚠️ N risk pts in today's schedule · apply fixes below"
+
+The bar fills with "% of raw risk cleared" — starts at 0% (truthful), climbs visibly as fixes land.
+
+---
+
+## 🔧 Fix engine with session overlay — `src/safety/fix_engine.py`
+
+Seven fix proposers: `item_substitute`, `vehicle_swap`, `stop_cancel`, `driver_swap`, `route_pair`, `route_redistribute`, plus an item-alternate ranker. Each produces a `{table, where, set}` patch applied to an **in-memory overlay** — source parquet is never written. Clicking Reset clears all applied fixes.
+
+---
+
+## 🍱 Surplus Match — `src/surplus/matcher.py`
+
+When a restaurant or kitchen has surplus food to donate:
+
+1. Filters to `enrolment_status == "active"` clients (~378 of 500)
+2. Canonicalises allergen aliases (`milk → dairy`, `gluten → wheat`, `nut → tree_nut`)
+3. **Hard-stops on severe / anaphylactic** client allergies
+4. Ranks survivors by `food_security_level` (severe first), then proximity
+5. Also returns the top 5 nearby **excluded** clients so the UI can show the safety story
+
+Three demo scenario presets, folium mini-map with green / red pins, waste-saved impact chip.
+
+---
+
+## 📅 Severity calendar
+
+Sidebar monthly grid; every day coloured by its worst violation severity. Click a cell → URL query param → the whole UI updates for that date. Cached for the session.
+
+---
+
+## 🎭 ARIA — the character
+
+Animated SVG shield with 4 severity-reactive states:
+
+| State | Trigger | Visual |
+|---|---|---|
+| `happy` | 0 violations | 🟢 green, gentle float, smile |
+| `ok` | low / medium only | 🔵 teal, steady |
+| `warning` | any HIGH | 🟠 amber, faster pulse, wide eyes |
+| `critical` | any CRITICAL | 🔴 red, shake, alarmed mouth |
+
+The sidebar brand chip and severity calendar all react to the same state.
+
+---
+
+## The dataset
+
+| Table | Rows | What |
+|---|---|---|
+| `depots` | 2 | Distribution hubs with lat / lng |
+| `vehicles` | 8 | 5 refrigerated, 1 with wheelchair lift (VEH-06) |
+| `drivers` | 8 | Language skills, pet allergy, max hours, wheelchair certified |
+| `clients` | 500 | Allergy severity per type, food-security level, mobility, consent |
+| `requests` | 10,000 | `cold_chain`, `required_driver_skills`, `scheduled_date` |
+| `items` | 150 | `allergen_flags`, `dietary_tags`, `cold_chain_required` |
+| `request_items` | ~24,000 | Line items: request × item × quantity |
+| `routes` | 300 | `service_date`, driver, vehicle, planned minutes |
+| `stops` | ~3,500 | `status` ∈ {completed, skipped, no_answer, cancelled, rerouted} |
+
+The data is **synthetic** (generated by `tracks/food-security-delivery/generator/generate.py`) but deliberately messy — phone formats, date formats, nulls, 9 seeded red-flag patterns with ground truth.
+
+---
+
+## Repo layout
+
+```
+.
+├── app/                          Streamlit UI
+│   ├── copilot.py                landing + login gate
+│   ├── _role.py                  enforce_role + role chip + nav filter
+│   ├── _character.py             ARIA animated SVG
+│   ├── _calendar.py              severity calendar in sidebar
+│   ├── _sections.py              brief / anomalies / map renderers
+│   ├── _layout.py                global CSS + animations
+│   ├── _data.py                  shared cached loaders
+│   ├── _fleet_view.py            fleet-health renderer (used by Coordinator)
+│   └── pages/                    5 sub-pages
+├── src/
+│   ├── safety/                   detectors + models + fix_engine + score
+│   ├── optimizer/                constrained_greedy + vrp + baseline
+│   ├── brief/                    templated morning brief
+│   ├── surplus/                  surplus-food matcher
+│   └── io/                       golden join helper
+├── shared/                       kit-provided loaders + validators
+├── tracks/food-security-delivery/
+│   ├── generator/                synthetic data generator
+│   └── data/{raw,sample}/        parquets + sample CSVs
+├── eval/                         scorecard.py + SCORECARD.md
+├── tests/                        pytest suite
+├── scripts/                      Playwright screenshot regen
+└── docs/                         this folder
+```
+
+**Key principle:** `src/` is pure Python over pandas DataFrames — no Streamlit imports. The same code powers the UI, the eval harness, and the test suite.
+
+---
+
+## Role gating
+
+The role gate is enforced both in `app/copilot.py` (login + auto-redirect) and in each sub-page via `app/_role.py::enforce_role(allowed)`. Sidebar nav links are hidden via injected CSS targeting `[data-testid="stSidebarNavLink"][href$="/X"]`.
